@@ -1,4 +1,4 @@
-package com.example.kdexmusicplayer;
+package com.example.yggdrasil;
 
 import android.Manifest;
 import android.content.ComponentName;

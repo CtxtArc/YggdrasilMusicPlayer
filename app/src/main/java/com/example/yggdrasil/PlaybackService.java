@@ -1,4 +1,4 @@
-package com.example.kdexmusicplayer;
+package com.example.yggdrasil;
 
 import android.os.Bundle;
 import androidx.annotation.Nullable;

@@ -1,4 +1,4 @@
-package com.example.kdexmusicplayer;
+package com.example.yggdrasil;
 
 import androidx.annotation.NonNull;
 import androidx.room.Entity;

@@ -1,4 +1,4 @@
-package com.example.kdexmusicplayer;
+package com.example.yggdrasil;
 
 import android.app.Application;
 import com.google.android.material.color.DynamicColors;

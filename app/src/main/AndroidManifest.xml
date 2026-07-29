@@ -14,13 +14,13 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.KdexMusicPlayer">
+        android:theme="@style/Theme.Yggdrasil">
 
         <service
             android:name=".PlaybackService"
             android:enabled="true"
             android:exported="true"
-            android:theme="@style/Theme.KdexMusicPlayer"
+            android:theme="@style/Theme.Yggdrasil"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />

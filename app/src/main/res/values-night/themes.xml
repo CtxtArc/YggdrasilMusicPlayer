@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Base.Theme.KdexMusicPlayer" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Base.Theme.Yggdrasil" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Vibrant Dark Theme (Night) -->
         <item name="colorPrimary">@color/vibrant_red</item>
         <item name="colorOnPrimary">@color/black</item>

@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "KdexMusicPlayer"
+rootProject.name = "Yggdrasil"
 include(":app")

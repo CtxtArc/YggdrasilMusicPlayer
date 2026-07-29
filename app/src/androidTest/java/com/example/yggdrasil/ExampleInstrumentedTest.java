@@ -1,4 +1,4 @@
-package com.example.kdexmusicplayer;
+package com.example.yggdrasil;
 
 import android.content.Context;
 
@@ -21,6 +21,6 @@ public class ExampleInstrumentedTest {
     public void useAppContext() {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("com.example.kdexmusicplayer", appContext.getPackageName());
+        assertEquals("com.example.yggdrasil", appContext.getPackageName());
     }
 }

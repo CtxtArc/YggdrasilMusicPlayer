@@ -3,22 +3,32 @@ plugins {
 }
 
 android {
-    namespace = "com.example.kdexmusicplayer"
+    namespace = "com.example.yggdrasil"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.kdexmusicplayer"
+        applicationId = "com.example.yggdrasil"
         minSdk = 33
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "Yggdrasil_Android13"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("../yggdrasil.jks")
+            storePassword = "password123"
+            keyAlias = "yggdrasil"
+            keyPassword = "password123"
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
