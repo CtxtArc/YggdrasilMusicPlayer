@@ -1,8 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
 }
 
 android {
+    val properties = Properties()
+    val propertiesFile = rootProject.file("local.properties")
+    if (propertiesFile.exists()) {
+        properties.load(propertiesFile.inputStream())
+    }
+
     namespace = "com.example.yggdrasil"
     compileSdk = 35
 
@@ -19,9 +27,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("../yggdrasil.jks")
-            storePassword = "password123"
+            storePassword = properties.getProperty("RELEASE_STORE_PASSWORD")
             keyAlias = "yggdrasil"
-            keyPassword = "password123"
+            keyPassword = properties.getProperty("RELEASE_KEY_PASSWORD")
         }
     }
 
@@ -39,6 +47,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+}
+
+base {
+    archivesName.set("Yggradsil_v0.2")
 }
 
 dependencies {
@@ -65,4 +77,7 @@ dependencies {
     // Glide for Album Art
     implementation(libs.glide)
     annotationProcessor(libs.glide.compiler)
+
+    // GSON for Backup/Restore
+    implementation("com.google.code.gson:gson:2.10.1")
 }

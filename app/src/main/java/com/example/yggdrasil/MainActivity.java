@@ -118,6 +118,8 @@ public class MainActivity extends AppCompatActivity {
 
     private ImageButton shuffleButton;
     private ImageButton repeatButton;
+    private Button btnBackup;
+    private Button btnRestore;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable updateSeekBarTask = new Runnable() {
         @Override
@@ -334,6 +336,33 @@ public class MainActivity extends AppCompatActivity {
 
         shuffleButton = findViewById(R.id.shuffleButton);
         repeatButton = findViewById(R.id.repeatButton);
+        btnBackup = findViewById(R.id.btnBackup);
+        btnRestore = findViewById(R.id.btnRestore);
+
+        btnBackup.setOnClickListener(v -> {
+            backgroundExecutor.execute(() -> {
+                BackupManager.exportBackup(this, db);
+                runOnUiThread(() -> Toast.makeText(this, "Backup saved to: " + getExternalFilesDir(null), Toast.LENGTH_LONG).show());
+            });
+        });
+
+        btnRestore.setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                .setTitle("Restore Data")
+                .setMessage("This will merge tags and playlists from the backup. Continue?")
+                .setPositiveButton("Restore", (dialog, which) -> {
+                    backgroundExecutor.execute(() -> {
+                        BackupManager.importBackup(this, db);
+                        runOnUiThread(() -> {
+                            refreshPlaylists();
+                            loadMusic();
+                            Toast.makeText(this, "Restore complete!", Toast.LENGTH_SHORT).show();
+                        });
+                    });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        });
 
         shuffleButton.setOnClickListener(v -> {
             if (mediaController != null) {
@@ -591,6 +620,7 @@ public class MainActivity extends AppCompatActivity {
     private void refreshPlaylists() {
         backgroundExecutor.execute(() -> {
             List<Playlist> playlists = db.playlistDao().getAllPlaylists();
+            BackupManager.exportBackup(this, db);
             runOnUiThread(() -> {
                 playlistAdapter.setPlaylists(playlists);
                 refreshDrawerTags();
@@ -633,6 +663,7 @@ public class MainActivity extends AppCompatActivity {
             if (!name.isEmpty()) {
                 backgroundExecutor.execute(() -> {
                     db.playlistDao().insert(new Playlist(name));
+                    BackupManager.exportBackup(this, db);
                     refreshPlaylists();
                 });
             }
@@ -702,6 +733,7 @@ public class MainActivity extends AppCompatActivity {
             for (int i = 0; i < tracks.size(); i++) {
                 db.playlistDao().updateTrackOrder(playlistId, tracks.get(i).getFilePath(), i);
             }
+            BackupManager.exportBackup(this, db);
         });
     }
 
@@ -844,6 +876,7 @@ public class MainActivity extends AppCompatActivity {
                                     db.playlistDao().removeTrackFromPlaylist(playlist.getId(), track.getFilePath());
                                     inPlaylists.remove(playlist.getId());
                                 }
+                                BackupManager.exportBackup(MainActivity.this, db);
                             });
                         });
                     }
@@ -911,6 +944,7 @@ public class MainActivity extends AppCompatActivity {
                 
                 backgroundExecutor.execute(() -> {
                     db.trackDao().update(track);
+                    BackupManager.exportBackup(this, db);
                     runOnUiThread(() -> {
                         if (adapter != null) {
                             adapter.notifyItemChanged(position);
