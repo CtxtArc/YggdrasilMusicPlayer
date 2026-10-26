@@ -41,8 +41,11 @@ import com.google.android.material.chip.ChipGroup;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import com.google.android.material.materialswitch.MaterialSwitch;
+import java.io.File;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -115,6 +118,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView currentLibraryPathText;
     private String selectedLibraryPath;
     private ActivityResultLauncher<Uri> folderPickerLauncher;
+    private ActivityResultLauncher<IntentSenderRequest> deleteMediaLauncher;
+    private MusicTrack trackPendingDelete;
+    private MaterialSwitch switchEnableDeleteSongs;
 
     private ImageButton shuffleButton;
     private ImageButton repeatButton;
@@ -219,6 +225,50 @@ public class MainActivity extends AppCompatActivity {
             prefs.edit().remove("library_path").apply();
             updateLibraryPathUI();
             loadMusic();
+        });
+
+        deleteMediaLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartIntentSenderForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK) {
+                        if (trackPendingDelete != null) {
+                            performPostDeleteCleanup(trackPendingDelete);
+                            trackPendingDelete = null;
+                        }
+                    } else {
+                        Toast.makeText(this, "Failed to delete song", Toast.LENGTH_SHORT).show();
+                        trackPendingDelete = null;
+                    }
+                }
+        );
+
+        switchEnableDeleteSongs = findViewById(R.id.switchEnableDeleteSongs);
+        boolean deleteEnabled = prefs.getBoolean("enable_delete_songs", false);
+        switchEnableDeleteSongs.setChecked(deleteEnabled);
+
+        switchEnableDeleteSongs.setOnClickListener(v -> {
+            boolean isChecked = switchEnableDeleteSongs.isChecked();
+            if (isChecked) {
+                switchEnableDeleteSongs.setChecked(false);
+                new AlertDialog.Builder(this)
+                        .setTitle("Enable Deleting Songs")
+                        .setMessage("Are you sure you want to enable deleting songs? When enabled, double-clicking a song will allow you to delete it permanently from your storage.")
+                        .setPositiveButton("Enable", (dialog, which) -> {
+                            switchEnableDeleteSongs.setChecked(true);
+                            prefs.edit().putBoolean("enable_delete_songs", true).apply();
+                        })
+                        .setNegativeButton("Cancel", (dialog, which) -> {
+                            switchEnableDeleteSongs.setChecked(false);
+                            prefs.edit().putBoolean("enable_delete_songs", false).apply();
+                        })
+                        .setOnCancelListener(dialog -> {
+                            switchEnableDeleteSongs.setChecked(false);
+                            prefs.edit().putBoolean("enable_delete_songs", false).apply();
+                        })
+                        .show();
+            } else {
+                prefs.edit().putBoolean("enable_delete_songs", false).apply();
+            }
         });
         
         ImageButton nextButton = findViewById(R.id.nextButton);
@@ -823,8 +873,108 @@ public class MainActivity extends AppCompatActivity {
             showPlaylistManagementDialog(track);
         });
 
+        View btnDeleteSong = view.findViewById(R.id.btnDeleteSong);
+        boolean canDelete = getSharedPreferences("MusicPlayerPrefs", MODE_PRIVATE).getBoolean("enable_delete_songs", false);
+        if (canDelete) {
+            btnDeleteSong.setVisibility(View.VISIBLE);
+            btnDeleteSong.setOnClickListener(v -> {
+                bottomSheetDialog.dismiss();
+                showDeleteSongConfirmDialog(track);
+            });
+        } else {
+            btnDeleteSong.setVisibility(View.GONE);
+        }
+
         bottomSheetDialog.setContentView(view);
         bottomSheetDialog.show();
+    }
+
+    private void showDeleteSongConfirmDialog(MusicTrack track) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Song")
+                .setMessage("Are you sure you want to permanently delete '" + track.getTitle() + "' from your storage?")
+                .setPositiveButton("Delete", (dialog, which) -> deleteTrackFromStorageAndDb(track))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void deleteTrackFromStorageAndDb(MusicTrack track) {
+        backgroundExecutor.execute(() -> {
+            boolean deleted = false;
+            String pathOrUri = track.getFilePath();
+
+            if (pathOrUri.startsWith("content://")) {
+                Uri uri = Uri.parse(pathOrUri);
+                try {
+                    int rows = getContentResolver().delete(uri, null, null);
+                    if (rows > 0) {
+                        deleted = true;
+                    }
+                } catch (SecurityException e) {
+                    try {
+                        android.app.PendingIntent pendingIntent = MediaStore.createDeleteRequest(getContentResolver(), Collections.singletonList(uri));
+                        IntentSenderRequest request = new IntentSenderRequest.Builder(pendingIntent.getIntentSender()).build();
+                        trackPendingDelete = track;
+                        runOnUiThread(() -> deleteMediaLauncher.launch(request));
+                        return;
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            } else {
+                File file = new File(pathOrUri);
+                if (file.exists()) {
+                    deleted = file.delete();
+                }
+                try {
+                    getContentResolver().delete(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                            MediaStore.Audio.Media.DATA + "=?", new String[]{pathOrUri});
+                } catch (Exception ignored) {}
+            }
+
+            final boolean isDeleted = deleted;
+            runOnUiThread(() -> {
+                if (isDeleted) {
+                    performPostDeleteCleanup(track);
+                } else {
+                    Toast.makeText(MainActivity.this, "Failed to delete song file", Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+    }
+
+    private void performPostDeleteCleanup(MusicTrack track) {
+        backgroundExecutor.execute(() -> {
+            db.trackDao().deleteByPath(track.getFilePath());
+
+            runOnUiThread(() -> {
+                if (mediaController != null) {
+                    for (int i = 0; i < mediaController.getMediaItemCount(); i++) {
+                        MediaItem item = mediaController.getMediaItemAt(i);
+                        if (item != null && track.getFilePath().equals(item.mediaId)) {
+                            mediaController.removeMediaItem(i);
+                            break;
+                        }
+                    }
+                }
+
+                musicLibrary.getAllTracks().removeIf(t -> t.getFilePath().equals(track.getFilePath()));
+
+                if (adapter != null) {
+                    adapter.getTracks().removeIf(t -> t.getFilePath().equals(track.getFilePath()));
+                    adapter.notifyDataSetChanged();
+                }
+
+                refreshDrawerTags();
+                refreshPlaylists();
+
+                BackupManager.exportBackup(MainActivity.this, db);
+
+                Toast.makeText(MainActivity.this, "Deleted: " + track.getTitle(), Toast.LENGTH_SHORT).show();
+            });
+        });
     }
 
     private void showPlaylistManagementDialog(MusicTrack track) {

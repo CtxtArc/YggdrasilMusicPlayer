@@ -21,6 +21,9 @@ public interface TrackDao {
     @Update
     void update(MusicTrack track);
 
+    @Query("DELETE FROM tracks WHERE filePath = :path")
+    void deleteByPath(String path);
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertAll(List<MusicTrack> tracks);
 
